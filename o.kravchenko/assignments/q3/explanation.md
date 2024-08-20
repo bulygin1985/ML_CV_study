@@ -21,6 +21,18 @@ W \in \mathbb{R}^{N \times C}
 $$
 
 $$
+b = 
+\begin{bmatrix}
+6 \\[0.3em]
+1 \\[0.3em]
+9
+\end{bmatrix}
+\newline \\[0.6em]
+b \in \mathbb{R}^{C}
+$$
+
+
+$$
 X = 
 \begin{bmatrix}
   \begin{bmatrix}
@@ -54,22 +66,22 @@ y =
 y \in \mathbb{R}^{C}
 $$
 
-Let's take only the first example, i = 1
+Let's take only the first example, q = 1
 
 $$
-X_i = 
+X_1 = 
 \begin{bmatrix}
 1 & 2 & 3 \\[0.3em]
 4 & 5 & 6 \\[0.3em]
 7 & 8 & 9
 \end{bmatrix}
 \newline \\[0.6em]
-X_i \in \mathbb{R}^{D}
+X_q \in \mathbb{R}^{D}
 $$
 
 
 $$
-y_i = 0 \\[0.3em]
+y_1 = 0 \\[0.3em]
 $$
 
 ## Step 1. Find and normalize scores
@@ -77,18 +89,19 @@ $$
 ### Matrix multiplication
 
 $$
-S_i = f(x_i, W)= X_i W
+S_q = f(x_q, W)= X_q W + b
 \newline \\[0.6em]
-S_i \in \mathbb{R}^{M \times C}
+S_q \in \mathbb{R}^{M \times C}
+\newline \\[0.6em]
 $$
 
 
-Formula to find one element ($s$) for *i* row and *j* column:
+Formula to find one element ($e$) for *i* row and *j* column in matrix multiplication:
 
-$$ s_{ij} = \sum_{k=1}^{N}x_{ik} \cdot w_{kj} $$
+$$ e_{ij} = \sum_{k=1}^{N}x_{ik} \cdot w_{kj} $$
 
 $$
-S_i = 
+S_1 = 
 \begin{bmatrix}
 1 & 2 & 3 \\[0.3em]
 4 & 5 & 6 \\[0.3em]
@@ -100,12 +113,24 @@ S_i =
 0.4 & 0.5 & 0.6 \\[0.3em]
 0.7 & 0.8 & 0.9
 \end{bmatrix}
++
+\begin{bmatrix}
+6 \\[0.3em]
+1 \\[0.3em]
+9
+\end{bmatrix}
 = 
 \newline \\[0.6em]
 = \begin{bmatrix}
 1*0.1+2*0.4+3*0.7 & 1*0.2+2*0.5+3*0.8 & 1*0.3+2*0.6+3*0.9 \\[0.6em]
 4*0.1+5*0.4+6*0.7 & 4*0.2+5*0.5+6*0.8 & 4*0.3+5*0.6+6*0.9 \\[0.6em]
 7*0.1+8*0.4+9*0.7 & 7*0.2+8*0.5+9*0.8 & 7*0.3+8*0.6+9*0.9
+\end{bmatrix}
++
+\begin{bmatrix}
+6 \\[0.3em]
+1 \\[0.3em]
+9
 \end{bmatrix}
 =
 \newline \\[0.6em]
@@ -114,20 +139,32 @@ S_i =
 6.6 & 8.1 & 9.6 \\[0.3em]
 10.2 & 12.6 & 15
 \end{bmatrix}
++
+\begin{bmatrix}
+6 \\[0.3em]
+1 \\[0.3em]
+9
+\end{bmatrix}
+=
+\begin{bmatrix}
+9 & 9.6 & 10.2 \\[0.3em]
+7.6 & 9.1 & 10.6 \\[0.3em]
+19.2 & 21.6 & 24
+\end{bmatrix}
 $$
 
 ### Normalization
 
 $$
-\hat{S_i} = S_i - max(S_i)
+\hat{S_q} = S_q - max(S_q)
 \newline \\[0.3em]
-max(S_i) = 15
+max(S_1) = 24
 \newline \\[0.6em]
-\hat{S_i} = 
+\hat{S_1} = 
 \begin{bmatrix}
--12  & -8.4 & -4.8 \\[0.3em]
--11.4 & -6.9 & -2.4 \\[0.3em]
--10.8 & -5.4 & 0
+-15  & -14.4 & -13.8 \\[0.3em]
+-16.4 & -14.9 & -13.4 \\[0.3em]
+-4.8 & -2.4 & 0
 \end{bmatrix}
 $$
 
