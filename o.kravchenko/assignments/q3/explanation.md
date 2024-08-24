@@ -175,7 +175,8 @@ $$
 \Large
 p_{mj} (\hat{S}) = \dfrac{e^{\hat{S}_{mj}}}{\sum_{c=1}^C e^{\hat{S}_{mc}}} 
 \newline \\[0.6em]
-j \in C, m \in M
+\normalsize
+m \in M,\; j \in C
 $$
 
 $$
@@ -195,7 +196,7 @@ e^{-4.8} & e^{-2.4} & e^0
 $$
 
 $$
-P = 
+p = 
 \begin{bmatrix}
 0.16280717 & 0.296654   & 0.54053883 \\[0.3em]
 0.03911257 & 0.17529039 & 0.78559703  \\[0.3em]
@@ -206,12 +207,19 @@ $$
 Loss function calculation
 
 $$
-
+L = - log(p_c) \text{,\; where $c$ is an index of the correct class}
 $$
-
 
 ## Step 3. Gradient evaluation
 Get the gradient
+
+$$
+L = - log(p_c) \text{,\; where $c$ is an index of the correct class}
+\newline \\[0.6em]
+\nabla_{z_c} L = \dfrac{\delta L}{\delta p_i} \cdot \dfrac{\delta p_i}{\delta z_c}
+\newline \\[0.6em]
+\dfrac{\delta L}{\delta p_i} = - \dfrac {1}{p_i}
+$$
 
 
 Evaluate the gradient
