@@ -171,9 +171,36 @@ $$
 ## Step 2. Find loss function
 Probabilities calculation
 
-
+$$
+\Large
+p_{mj} (\hat{S}) = \dfrac{e^{\hat{S}_{mj}}}{\sum_{c=1}^C e^{\hat{S}_{mc}}} 
+\newline \\[0.6em]
+j \in C, m \in M
 $$
 
+$$
+e^{\hat{S}} = 
+\begin{bmatrix}
+e^{-15}  & e^{-14.4} & e^{-13.8} \\[0.3em]
+e^{-16.4} & e^{-14.9} & e^{-13.4} \\[0.3em]
+e^{-4.8} & e^{-2.4} & e^0
+\end{bmatrix}
+=
+\newline \\[0.6em]
+= \begin{bmatrix}
+3.059e-7 & 5.574e-7 & 1.016e-6 \\[0.3em]
+7.543e-8 & 3.381e-7 & 1.515e-6 \\[0.3em]
+8.23e-3 & 9.072e-2 & 1
+\end{bmatrix}
+$$
+
+$$
+P = 
+\begin{bmatrix}
+0.16280717 & 0.296654   & 0.54053883 \\[0.3em]
+0.03911257 & 0.17529039 & 0.78559703  \\[0.3em]
+0.00748875 & 0.08254984 & 0.90996141
+\end{bmatrix}
 $$
 
 Loss function calculation
