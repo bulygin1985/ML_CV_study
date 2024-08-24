@@ -98,7 +98,7 @@ $$
 
 Formula to find one element ($e$) for *i* row and *j* column in matrix multiplication:
 
-$$ e_{ij} = \sum_{k=1}^{N}x_{ik} \cdot w_{kj} $$
+$$ e_{ij} = \sum_{n=1}^{N}x_{in} \cdot w_{nj} $$
 
 $$
 S_1 = 
@@ -193,7 +193,7 @@ Evaluate the gradient
 ## Step 4. Apply regularization
 
 $$
-L = \frac{1}{N} \sum_{i=1}^{N} L_i + \lambda R(W)
+L = \frac{1}{N} \sum_{n=1}^{N} L_n + \lambda R(W)
 \newline \\[0.6em]
 R(W) = \sum_k \sum_l W_{kl}^2
 $$
