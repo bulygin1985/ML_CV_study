@@ -207,22 +207,58 @@ $$
 Loss function calculation
 
 $$
-L = - log(p_c) \text{,\; where $c$ is an index of the correct class}
+L = - log(p_j) \text{,\; where $j$ is an index of the correct class}
 $$
 
-## Step 3. Gradient evaluation
+## Step 3. Find gradient
 Get the gradient
 
 $$
-L = - log(p_c) \text{,\; where $c$ is an index of the correct class}
+L = - log(p_j) \text{,\; where $j$ is an index of the correct class}
 \newline \\[0.6em]
-\nabla_{z_c} L = \dfrac{\delta L}{\delta p_i} \cdot \dfrac{\delta p_i}{\delta z_c}
+\nabla_{z_j} L = \dfrac{\delta L}{\delta p_i} \cdot \dfrac{\delta p_i}{\delta z_j}
 \newline \\[0.6em]
 \dfrac{\delta L}{\delta p_i} = - \dfrac {1}{p_i}
 $$
 
+$$
+\large
+\dfrac{\delta p_i}{\delta z_j} =
+\dfrac{\delta}{\delta z_j} (\dfrac{e^{z_i}}{\sum_{c=1}^C e^{z_c}})
+$$
 
-Evaluate the gradient
+### If $i=j$:
+
+Use quotient rule
+
+$$
+\large
+\dfrac{\delta p_i}{\delta z_i} = 
+\dfrac{e^{z_i} \sum_{c=1}^C e^{z_c} - e^{z_i} e^{z_i}}
+{(\sum_{c=1}^C e^{z_c})^2} = 
+\newline \\[0.6em]
+= p_i (\dfrac{\sum_{c=1}^C e^{z_c} - e^{z_i}}{\sum_{c=1}^C e^{z_c}}) = p_i (1 - p_i)
+$$
+
+### If $i \neq j$:
+
+Use quotient rule
+
+$$
+\large
+\dfrac{\delta p_i}{\delta z_j} = 
+\dfrac{-e^{z_i} e^{z_j}}{(\sum_{c=1}^C e^{z_c})^2} = 
+-p_i p_j
+\newline \\[1.5em]
+$$
+
+$$
+\nabla_{z_j} L = - \dfrac {1}{p_i} \cdot p_i (Y_{j} - p_j) = p_j - Y_{j}
+\newline \\[0.6em]
+j \in C, Y_{j} \in \{0,1\}
+$$
+
+Gradient calculation
 
 
 ## Step 4. Apply regularization
