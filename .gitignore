@@ -1,0 +1,7 @@
+__pycache__
+
+# dataset data
+*_batch*
+*.npz
+batches.meta
+readme.html
