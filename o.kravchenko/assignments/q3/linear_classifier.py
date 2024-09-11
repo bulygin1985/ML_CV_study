@@ -1,14 +1,16 @@
 from __future__ import print_function
 
 from builtins import object, range
+from copy import deepcopy
+from typing import Optional, Tuple
 
 import numpy as np
 from softmax_classifier import softmax_loss_vectorized
 
 
 class LinearClassifier(object):
-    def __init__(self):
-        self.W = None
+    def __init__(self, weights: Optional[np.array] = None):
+        self.W: np.array = weights
 
     def train(
         self,
@@ -47,6 +49,7 @@ class LinearClassifier(object):
 
         # Run stochastic gradient descent to optimize W
         loss_history = []
+        weights_history = []
         for it in range(num_iters):
             X_batch = None
             y_batch = None
@@ -57,8 +60,8 @@ class LinearClassifier(object):
             X_batch = X[indices]
             y_batch = y[indices]
 
+            # TODO: augmentation func with horizontal flip with p = 0.5
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
             # evaluate loss and gradient
             loss, grad = self.loss(X_batch, y_batch, reg)
             loss_history.append(loss)
@@ -67,13 +70,14 @@ class LinearClassifier(object):
             # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
             self.W -= learning_rate * grad
+            weights_history.append(deepcopy(self.W))
 
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
             if verbose and it % 100 == 0:
                 print("iteration %d / %d: loss %f" % (it, num_iters, loss))
 
-        return loss_history
+        return loss_history, weights_history
 
     def predict(self, X):
         """
@@ -98,7 +102,7 @@ class LinearClassifier(object):
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         return y_pred
 
-    def loss(self, X_batch, y_batch, reg):
+    def loss(self, X_batch, y_batch, reg) -> Tuple[float, np.array]:
         """
         Compute the loss function and its derivative.
         Subclasses will override this.
@@ -119,5 +123,5 @@ class LinearClassifier(object):
 class Softmax(LinearClassifier):
     """A subclass that uses the Softmax + Cross-entropy loss function"""
 
-    def loss(self, X_batch, y_batch, reg):
+    def loss(self, X_batch, y_batch, reg) -> Tuple[float, np.array]:
         return softmax_loss_vectorized(self.W, X_batch, y_batch, reg)
