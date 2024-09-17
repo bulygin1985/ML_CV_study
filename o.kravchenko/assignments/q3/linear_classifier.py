@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 from softmax_classifier import softmax_loss_vectorized
+from utils import flip_horizontal
 
 
 class LinearClassifier(object):
@@ -21,23 +22,28 @@ class LinearClassifier(object):
         num_iters=100,
         batch_size=200,
         verbose=False,
+        is_apply_augmentation=True,
     ):
         """
         Train this linear classifier using stochastic gradient descent.
 
         Inputs:
-        - X: A numpy array of shape (N, D) containing training data; there are N
-          training samples each of dimension D.
+        - X: A numpy array of shape (N, D) containing training data;
+        there are N training samples each of dimension D.
         - y: A numpy array of shape (N,) containing training labels; y[i] = c
           means that X[i] has label 0 <= c < C for C classes.
         - learning_rate: (float) learning rate for optimization.
         - reg: (float) regularization strength.
         - num_iters: (integer) number of steps to take when optimizing
-        - batch_size: (integer) number of training examples to use at each step.
+        - batch_size: (integer) number of training examples to use
+        at each step.
         - verbose: (boolean) If true, print progress during optimization.
+        - is_apply_augmentation: (boolean) If true, applies augmentation for
+        each batch of X.
 
         Outputs:
-        A list containing the value of the loss function at each training iteration.
+        A list containing the value of the loss function
+        at each training iteration.
         """
         num_train, dim = X.shape
         num_classes = (
@@ -60,7 +66,9 @@ class LinearClassifier(object):
             X_batch = X[indices]
             y_batch = y[indices]
 
-            # TODO: augmentation func with horizontal flip with p = 0.5
+            if is_apply_augmentation:
+                X_batch = flip_horizontal(X_batch)
+
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
             # evaluate loss and gradient
             loss, grad = self.loss(X_batch, y_batch, reg)
