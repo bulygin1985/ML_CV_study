@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 from softmax_classifier import softmax_loss_vectorized
-from utils import flip_horizontal
+from utils import check_gradient_explosion, flip_horizontal
 
 
 class LinearClassifier(object):
@@ -23,27 +23,31 @@ class LinearClassifier(object):
         batch_size=200,
         verbose=False,
         is_apply_augmentation=True,
+        is_decrease_lr=(False, 100),
     ):
         """
         Train this linear classifier using stochastic gradient descent.
 
-        Inputs:
-        - X: A numpy array of shape (N, D) containing training data;
-        there are N training samples each of dimension D.
-        - y: A numpy array of shape (N,) containing training labels; y[i] = c
-          means that X[i] has label 0 <= c < C for C classes.
-        - learning_rate: (float) learning rate for optimization.
-        - reg: (float) regularization strength.
-        - num_iters: (integer) number of steps to take when optimizing
-        - batch_size: (integer) number of training examples to use
-        at each step.
-        - verbose: (boolean) If true, print progress during optimization.
-        - is_apply_augmentation: (boolean) If true, applies augmentation for
-        each batch of X.
+        Args:
+            X: A numpy array of shape (N, D) containing training data;
+                there are N training samples each of dimension D.
+            y: A numpy array of shape (N,) containing training labels; y[i] = c
+                means that X[i] has label 0 <= c < C for C classes.
+            learning_rate (float): learning rate for optimization.
+            reg (float): regularization strength.
+            num_iters (integer): number of steps to take when optimizing
+            batch_size (integer): number of training examples to use
+                at each step.
+            verbose (boolean): If true, print progress during optimization.
+            is_apply_augmentation (boolean): If true, applies augmentation for
+                each batch of X.
+            is_decrease_lr (tuple of boolean and int): If true, decrease learning rate by 10
+                for gradient explosion.                Contains threshold
 
-        Outputs:
-        A list containing the value of the loss function
-        at each training iteration.
+
+        Returns:
+            list: containing the value of the loss function
+                at each training iteration.
         """
         num_train, dim = X.shape
         num_classes = (
@@ -60,8 +64,6 @@ class LinearClassifier(object):
             X_batch = None
             y_batch = None
 
-            # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
             indices = np.random.choice(num_train, batch_size, replace=True)
             X_batch = X[indices]
             y_batch = y[indices]
@@ -69,18 +71,21 @@ class LinearClassifier(object):
             if is_apply_augmentation:
                 X_batch = flip_horizontal(X_batch)
 
-            # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
             # evaluate loss and gradient
             loss, grad = self.loss(X_batch, y_batch, reg)
             loss_history.append(loss)
 
-            # perform parameter update
-            # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+            # fix gradient explosion
+            if is_decrease_lr[0] and check_gradient_explosion(
+                grad, threshold=is_decrease_lr[1]
+            ):
+                learning_rate /= 10
+                print(f"Learning rate is decreased {learning_rate=}")
+                print(f"gradient norm={np.linalg.norm(grad)}")
 
+            # perform parameter update
             self.W -= learning_rate * grad
             weights_history.append(deepcopy(self.W))
-
-            # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
             if verbose and it % 100 == 0:
                 print("iteration %d / %d: loss %f" % (it, num_iters, loss))
@@ -102,12 +107,10 @@ class LinearClassifier(object):
           class.
         """
         y_pred = np.zeros(X.shape[0])
-        # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
         scores = X.dot(self.W)
         y_pred = np.argmax(scores, axis=1)
 
-        # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         return y_pred
 
     def loss(self, X_batch, y_batch, reg) -> Tuple[float, np.array]:

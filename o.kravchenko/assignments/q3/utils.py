@@ -37,3 +37,7 @@ def flip_horizontal(data: np.array, prob: float = 0.5) -> np.array:
         data[i] = flip_data(data[i], prob=prob)
 
     return data
+
+
+def check_gradient_explosion(gradient: np.array, threshold=100) -> bool:
+    return np.linalg.norm(gradient) > threshold
