@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 
 
@@ -125,18 +127,17 @@ def softmax_loss(X, y):
     num_train = X.shape[0]
 
     scores = X
-    scores -= np.max(scores, axis=1, keepdims=True)
 
     exp_scores = np.exp(scores)
     probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
+    dx = deepcopy(probs)
     correct_class_probs = probs[np.arange(num_train), y]
 
     loss = np.sum(-np.log(correct_class_probs))
     loss /= num_train
 
     # Gradient calculation
-    dx = probs.copy()
-    dx[np.arange(num_train), y] = -1  # probs of correct class - 1
+    dx[np.arange(num_train), y] -= 1  # probs of correct class - 1
     dx /= num_train
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
