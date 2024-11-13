@@ -1,0 +1,640 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.datasets import cifar10
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
+
+
+
+# Функція для аугментації даних
+def augment_data(image):
+    # Випадкове горизонтальне відображення
+    if np.random.random() > 0.5:
+        image = np.fliplr(image)
+
+    # Випадкове обертання на невеликий кут
+    angle = np.random.uniform(-15, 15)
+    image = rotate_image(image, angle)
+
+    # Випадкова зміна яскравості
+    brightness = np.random.uniform(0.8, 1.2)
+    image = np.clip(image * brightness, 0, 1)
+
+    return image
+
+
+def rotate_image(image, angle):
+    # Конвертуємо кут в радіани
+    rads = np.deg2rad(angle)
+
+    # Створюємо матрицю повороту
+    c, s = np.cos(rads), np.sin(rads)
+    rot_mat = np.array([[c, -s, 0],
+                        [s, c, 0],
+                        [0, 0, 1]])
+
+    # Застосовуємо поворот
+    center = np.array(image.shape[:2]) / 2
+    rot_img = np.zeros_like(image)
+
+    for i in range(image.shape[0]):
+        for j in range(image.shape[1]):
+            src_pos = np.array([i - center[0], j - center[1], 1])
+            dst_pos = rot_mat.dot(src_pos)
+            dst_i, dst_j = int(dst_pos[0] + center[0]), int(dst_pos[1] + center[1])
+
+            if 0 <= dst_i < image.shape[0] and 0 <= dst_j < image.shape[1]:
+                rot_img[i, j] = image[dst_i, dst_j]
+
+    return rot_img
+
+
+def create_filters():
+    # Фільтри першого шару (16 простих фільтрів)
+    filters1 = np.array([
+        # Горизонтальні краї
+        [[[1, 1, 1],
+          [0, 0, 0],
+          [-1, -1, -1]]],
+        # Вертикальні краї
+        [[[1, 0, -1],
+          [1, 0, -1],
+          [1, 0, -1]]],
+        # Діагональні краї 1
+        [[[1, 1, 0],
+          [1, 0, -1],
+          [0, -1, -1]]],
+        # Діагональні краї 2
+        [[[0, 1, 1],
+          [-1, 0, 1],
+          [-1, -1, 0]]],
+        # Розмиття по Гауссу
+        [[[1 / 16, 2 / 16, 1 / 16],
+          [2 / 16, 4 / 16, 2 / 16],
+          [1 / 16, 2 / 16, 1 / 16]]],
+        # Підвищення різкості
+        [[[-1, -1, -1],
+          [-1, 9, -1],
+          [-1, -1, -1]]],
+        # Детектор країв Собеля X
+        [[[1, 0, -1],
+          [2, 0, -2],
+          [1, 0, -1]]],
+        # Детектор країв Собеля Y
+        [[[1, 2, 1],
+          [0, 0, 0],
+          [-1, -2, -1]]],
+        # Оператор Лапласа
+        [[[0, 1, 0],
+          [1, -4, 1],
+          [0, 1, 0]]],
+        # Підсилення країв
+        [[[0, -1, 0],
+          [-1, 5, -1],
+          [0, -1, 0]]],
+        # Рельєф 1
+        [[[-2, -1, 0],
+          [-1, 1, 1],
+          [0, 1, 2]]],
+        # Рельєф 2
+        [[[0, -1, -2],
+          [1, 1, -1],
+          [2, 1, 0]]],
+        # Детектор ліній 0°
+        [[[-1, -1, -1],
+          [2, 2, 2],
+          [-1, -1, -1]]],
+        # Детектор ліній 45°
+        [[[-1, -1, 2],
+          [-1, 2, -1],
+          [2, -1, -1]]],
+        # Детектор ліній 90°
+        [[[-1, 2, -1],
+          [-1, 2, -1],
+          [-1, 2, -1]]],
+        # Детектор ліній 135°
+        [[[2, -1, -1],
+          [-1, 2, -1],
+          [-1, -1, 2]]]
+    ])
+
+    # Фільтри другого шару (32 складніших фільтри)
+    filters2 = np.random.randn(32, 3, 3, 16) * 0.1
+
+    # Фільтри третього шару (64 фільтри)
+    filters3 = np.random.randn(64, 3, 3, 32) * 0.1
+
+    # Фільтри четвертого шару (128 фільтрів)
+    filters4 = np.random.randn(128, 3, 3, 64) * 0.1
+
+    # Фільтри п'ятого шару (256 фільтрів)
+    filters5 = np.random.randn(256, 3, 3, 128) * 0.1
+
+    return filters1, filters2, filters3, filters4, filters5
+
+
+# Функції прямого проходу
+def conv2d(X, filters, stride=1, padding='same'):
+    if padding == 'same':
+        pad_size = filters.shape[1] // 2
+        X_padded = np.pad(X, ((0, 0), (pad_size, pad_size), (pad_size, pad_size), (0, 0)), mode='constant')
+    else:
+        X_padded = X
+
+    n, h, w, c = X_padded.shape
+    f_count, f_height, f_width, f_channels = filters.shape
+    out_h = (h - f_height) // stride + 1
+    out_w = (w - f_width) // stride + 1
+    out = np.zeros((n, out_h, out_w, f_count))
+
+    for i in range(n):
+        for f in range(f_count):
+            for j in range(out_h):
+                for k in range(out_w):
+                    region = X_padded[i, j * stride:j * stride + f_height, k * stride:k * stride + f_width, :]
+                    out[i, j, k, f] = np.sum(region * filters[f])
+
+    return out
+
+
+def batch_norm(X, gamma=1, beta=0, epsilon=1e-5):
+    mu = np.mean(X, axis=(0, 1, 2), keepdims=True)
+    var = np.var(X, axis=(0, 1, 2), keepdims=True)
+    X_norm = (X - mu) / np.sqrt(var + epsilon)
+    return gamma * X_norm + beta, mu, var, X_norm
+
+
+def max_pooling(X, size=2, stride=2, force_size=None):
+    n, h, w, c = X.shape
+
+    #Використовуємо розмір входу якщо вказано force_size
+    if force_size:
+        pool_h = h
+        pool_w = w
+        stride = 1
+        out_h = 1
+        out_w = 1
+    else:
+        # Якщо size передано як число, створюємо кортеж (size, size)
+        if isinstance(size, (int, float)):
+            pool_h = pool_w = size
+        else:
+            pool_h, pool_w = size
+        out_h = (h - pool_h) // stride + 1
+        out_w = (w - pool_w) // stride + 1
+
+    out = np.zeros((n, out_h, out_w, c))
+    mask = np.zeros_like(X)
+
+    for i in range(n):
+        for j in range(out_h):
+            for k in range(out_w):
+                for l in range(c):
+                    h_start = j * stride
+                    h_end = h_start + pool_h
+                    w_start = k * stride
+                    w_end = w_start + pool_w
+
+                    # Перевіряємо, чи не виходимо за межі
+                    h_end = min(h_end, h)
+                    w_end = min(w_end, w)
+
+                    region = X[i, h_start:h_end, w_start:w_end, l]
+                    out[i, j, k, l] = np.max(region)
+
+                    # Зберігаємо позицію максимального елемента
+                    max_idx = np.unravel_index(np.argmax(region), region.shape)
+                    mask[i, h_start + max_idx[0], w_start + max_idx[1], l] = 1
+
+    return out, mask
+
+
+def softmax(X):
+    exp_X = np.exp(X - np.max(X, axis=1, keepdims=True))
+    return exp_X / np.sum(exp_X, axis=1, keepdims=True)
+
+
+def cross_entropy_loss(y_pred, y_true):
+    m = y_true.shape[0]
+    log_likelihood = -np.log(y_pred[range(m), np.argmax(y_true, axis=1)])
+    return np.mean(log_likelihood)
+
+
+# Функції зворотного поширення помилки
+def conv2d_backward(dZ, X, filters, stride=1, padding='same'):
+    if padding == 'same':
+        pad_size = filters.shape[1] // 2
+        X_padded = np.pad(X, ((0, 0), (pad_size, pad_size), (pad_size, pad_size), (0, 0)), mode='constant')
+    else:
+        X_padded = X
+
+    n, h, w, c = X_padded.shape
+    f_count, f_height, f_width, f_channels = filters.shape
+
+    dX_padded = np.zeros_like(X_padded)
+    dF = np.zeros_like(filters)
+
+    for i in range(n):
+        for f in range(f_count):
+            for j in range(0, h - f_height + 1, stride):
+                for k in range(0, w - f_width + 1, stride):
+                    region = X_padded[i, j:j + f_height, k:k + f_width, :]
+                    dF[f] += region * dZ[i, j // stride, k // stride, f]
+                    dX_padded[i, j:j + f_height, k:k + f_width, :] += filters[f] * dZ[i, j // stride, k // stride, f]
+
+    if padding == 'same':
+        dX = dX_padded[:, pad_size:-pad_size, pad_size:-pad_size, :]
+    else:
+        dX = dX_padded
+
+    return dX, dF
+
+
+def batch_norm_backward(dout, cache):
+    X_norm, mu, var, gamma = cache
+    N, H, W, C = dout.shape
+
+    dbeta = np.sum(dout, axis=(0, 1, 2), keepdims=True)
+    dgamma = np.sum(dout * X_norm, axis=(0, 1, 2), keepdims=True)
+
+    dX_norm = dout * gamma
+    dvar = np.sum(dX_norm * (X_norm - mu) * -0.5 * (var + 1e-5) ** (-1.5), axis=(0, 1, 2), keepdims=True)
+    dmu = np.sum(dX_norm * -1 / np.sqrt(var + 1e-5), axis=(0, 1, 2), keepdims=True)
+
+    dX = dX_norm / np.sqrt(var + 1e-5) + dvar * 2 * (X_norm - mu) / (N * H * W) + dmu / (N * H * W)
+
+    return dX, dgamma, dbeta
+
+
+def max_pooling_backward(dout, cache):
+    X, mask = cache
+    dX = np.zeros_like(X)
+
+    n, h, w, c = dout.shape
+    size = 2  # розмір вікна пулінгу
+
+    for i in range(n):
+        for j in range(h):
+            for k in range(w):
+                for l in range(c):
+                    # Знаходимо відповідну область в масці
+                    h_start = j * size
+                    h_end = min(h_start + size, X.shape[1])
+                    w_start = k * size
+                    w_end = min(w_start + size, X.shape[2])
+
+                    # Застосовуємо градієнт тільки до максимального елемента
+                    dX[i, h_start:h_end, w_start:w_end, l] += dout[i, j, k, l] * mask[i, h_start:h_end, w_start:w_end,
+                                                                                 l]
+
+    return dX
+
+
+class CNN:
+    def __init__(self):
+        self.filters1, self.filters2, self.filters3, self.filters4, self.filters5 = create_filters()
+        # Ініціалізація параметрів batch normalization
+        self.gamma1 = np.ones((1, 1, 1, 16))
+        self.beta1 = np.zeros((1, 1, 1, 16))
+        self.gamma2 = np.ones((1, 1, 1, 32))
+        self.beta2 = np.zeros((1, 1, 1, 32))
+        self.gamma3 = np.ones((1, 1, 1, 64))
+        self.beta3 = np.zeros((1, 1, 1, 64))
+        self.gamma4 = np.ones((1, 1, 1, 128))
+        self.beta4 = np.zeros((1, 1, 1, 128))
+        self.gamma5 = np.ones((1, 1, 1, 256))
+        self.beta5 = np.zeros((1, 1, 1, 256))
+
+        # Обчислення розміру входу для повнозв'язного шару
+        self.fc_input_size = 256  # 1 * 1 * 256
+
+        # Ініціалізація ваг для повнозв'язного шару
+        self.W = np.random.randn(self.fc_input_size, 10) * 0.01
+        self.b = np.zeros(10)
+        self.cache = {}
+
+        #dictionary всих параметрів
+        self.params = {
+            'W': self.W,
+            'b': self.b,
+            'filters1': self.filters1,
+            'filters2': self.filters2,
+            'filters3': self.filters3,
+            'filters4': self.filters4,
+            'filters5': self.filters5,
+            'gamma1': self.gamma1,
+            'beta1': self.beta1,
+            'gamma2': self.gamma2,
+            'beta2': self.beta2,
+            'gamma3': self.gamma3,
+            'beta3': self.beta3,
+            'gamma4': self.gamma4,
+            'beta4': self.beta4,
+            'gamma5': self.gamma5,
+            'beta5': self.beta5
+        }
+
+    def forward(self, X, training=False):
+        if training:
+            X = np.array([augment_data(img) for img in X])
+
+        # Перший блок
+        self.cache['conv1'] = conv2d(X, self.params['filters1'])
+        self.cache['bn1'], mu1, var1, X_norm1 = batch_norm(self.cache['conv1'], self.params['gamma1'],
+                                                           self.params['beta1'])
+        self.cache['bn1_cache'] = (X_norm1, mu1, var1, self.params['gamma1'])
+        self.cache['pool1'], self.cache['pool1_mask'] = max_pooling(self.cache['bn1'])
+
+        # Другий блок
+        self.cache['conv2'] = conv2d(self.cache['pool1'], self.params['filters2'])
+        self.cache['bn2'], mu2, var2, X_norm2 = batch_norm(self.cache['conv2'], self.params['gamma2'],
+                                                           self.params['beta2'])
+        self.cache['bn2_cache'] = (X_norm2, mu2, var2, self.params['gamma2'])
+        self.cache['pool2'], self.cache['pool2_mask'] = max_pooling(self.cache['bn2'])
+
+        # Третій блок
+        self.cache['conv3'] = conv2d(self.cache['pool2'], self.params['filters3'])
+        self.cache['bn3'], mu3, var3, X_norm3 = batch_norm(self.cache['conv3'], self.params['gamma3'],
+                                                           self.params['beta3'])
+        self.cache['bn3_cache'] = (X_norm3, mu3, var3, self.params['gamma3'])
+        self.cache['pool3'], self.cache['pool3_mask'] = max_pooling(self.cache['bn3'])
+
+        # Четвертий блок
+        self.cache['conv4'] = conv2d(self.cache['pool3'], self.params['filters4'])
+        self.cache['bn4'], mu4, var4, X_norm4 = batch_norm(self.cache['conv4'], self.params['gamma4'],
+                                                           self.params['beta4'])
+        self.cache['bn4_cache'] = (X_norm4, mu4, var4, self.params['gamma4'])
+        self.cache['pool4'], self.cache['pool4_mask'] = max_pooling(self.cache['bn4'])
+
+        # П'ятий блок
+        self.cache['conv5'] = conv2d(self.cache['pool4'], self.params['filters5'])
+        self.cache['bn5'], mu5, var5, X_norm5 = batch_norm(self.cache['conv5'], self.params['gamma5'],
+                                                           self.params['beta5'])
+        self.cache['bn5_cache'] = (X_norm5, mu5, var5, self.params['gamma5'])
+        self.cache['pool5'], self.cache['pool5_mask'] = max_pooling(self.cache['bn5'], force_size=True)
+
+        # Решейп для повнозв'язного шару
+        batch_size = X.shape[0]
+        self.cache['flat'] = self.cache['pool5'].reshape(batch_size, -1)
+
+        # Повнозв'язний шар
+        scores = np.dot(self.cache['flat'], self.params['W']) + self.params['b']
+        self.cache['scores'] = scores
+        probs = softmax(scores)
+        self.cache['probs'] = probs
+
+        return probs
+
+    def backward(self, X, y):
+        batch_size = X.shape[0]
+        gradients = {}  # Словник для зберігання всіх градієнтів
+
+        y = y.astype(int)
+        if y.ndim > 1 and y.shape[1] > 1:
+            y = np.argmax(y, axis=1)
+
+        # Градієнт для останнього шару
+        dscores = self.cache['probs'].copy()
+        dscores[range(batch_size), y] -= 1
+        dscores /= batch_size
+
+        # Градієнт для повнозв'язного шару
+        gradients['W'] = np.dot(self.cache['flat'].T, dscores)
+        gradients['b'] = np.sum(dscores, axis=0)
+        dflat = np.dot(dscores, self.params['W'].T)
+
+        # Решейп назад до форми після останнього пулінгу
+        dpool5 = dflat.reshape(self.cache['pool5'].shape)
+
+        # П'ятий блок
+        dbn5 = max_pooling_backward(dpool5, (self.cache['bn5'], self.cache['pool5_mask']))
+        dconv5, gradients['gamma5'], gradients['beta5'] = batch_norm_backward(dbn5, self.cache['bn5_cache'])
+        dpool4, gradients['filters5'] = conv2d_backward(dconv5, self.cache['pool4'], self.params['filters5'])
+
+        # Четвертий блок
+        dbn4 = max_pooling_backward(dpool4, (self.cache['bn4'], self.cache['pool4_mask']))
+        dconv4, gradients['gamma4'], gradients['beta4'] = batch_norm_backward(dbn4, self.cache['bn4_cache'])
+        dpool3, gradients['filters4'] = conv2d_backward(dconv4, self.cache['pool3'], self.params['filters4'])
+
+        # Третій блок
+        dbn3 = max_pooling_backward(dpool3, (self.cache['bn3'], self.cache['pool3_mask']))
+        dconv3, gradients['gamma3'], gradients['beta3'] = batch_norm_backward(dbn3, self.cache['bn3_cache'])
+        dpool2, gradients['filters3'] = conv2d_backward(dconv3, self.cache['pool2'], self.params['filters3'])
+
+        # Другий блок
+        dbn2 = max_pooling_backward(dpool2, (self.cache['bn2'], self.cache['pool2_mask']))
+        dconv2, gradients['gamma2'], gradients['beta2'] = batch_norm_backward(dbn2, self.cache['bn2_cache'])
+        dpool1, gradients['filters2'] = conv2d_backward(dconv2, self.cache['pool1'], self.params['filters2'])
+
+        # Перший блок
+        dbn1 = max_pooling_backward(dpool1, (self.cache['bn1'], self.cache['pool1_mask']))
+        dconv1, gradients['gamma1'], gradients['beta1'] = batch_norm_backward(dbn1, self.cache['bn1_cache'])
+        _, gradients['filters1'] = conv2d_backward(dconv1, X, self.params['filters1'])
+
+        return gradients
+
+
+def visualize_filters(filters, title):
+    """Візуалізація фільтрів"""
+    plt.figure(figsize=(15, 5))
+    for i in range(min(16, filters.shape[0])):
+        plt.subplot(2, 8, i + 1)
+        plt.imshow(filters[i, :, :, 0], cmap='gray')
+        plt.axis('off')
+    plt.suptitle(title)
+    plt.show()
+
+
+def visualize_feature_maps(feature_maps, layer_name):
+    """Візуалізація карт ознак"""
+    plt.figure(figsize=(15, 5))
+    for i in range(min(16, feature_maps.shape[-1])):
+        plt.subplot(2, 8, i + 1)
+        plt.imshow(feature_maps[0, :, :, i], cmap='gray')
+        plt.axis('off')
+    plt.suptitle(f'Feature maps from {layer_name}')
+    plt.show()
+
+
+
+class Adam:
+    def __init__(self, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8):
+        """
+        Ініціалізація оптимізатора Adam
+
+        Args:
+            learning_rate: швидкість навчання
+            beta1: коефіцієнт експоненційного згладжування для momentum
+            beta2: коефіцієнт експоненційного згладжування для RMSprop
+            epsilon: константа для числової стабільності
+        """
+        self.learning_rate = learning_rate
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = epsilon
+        self.m = {}  # перший момент (momentum)
+        self.v = {}  # другий момент (RMSprop)
+        self.t = 0  # часовий крок
+
+    def update(self, params, grads):
+        """
+        Оновлення параметрів
+
+        Args:
+            params: словник параметрів моделі
+            grads: словник градієнтів
+        """
+        if not self.m:  # ініціалізація моментів при першому виклику
+            for key in params:
+                self.m[key] = np.zeros_like(params[key])
+                self.v[key] = np.zeros_like(params[key])
+
+        self.t += 1
+
+        for key in params:
+            # Оновлення експоненційно зважених моментів
+            self.m[key] = self.beta1 * self.m[key] + (1 - self.beta1) * grads[key]
+            self.v[key] = self.beta2 * self.v[key] + (1 - self.beta2) * np.square(grads[key])
+
+            # Корекція зміщення
+            m_hat = self.m[key] / (1 - self.beta1 ** self.t)
+            v_hat = self.v[key] / (1 - self.beta2 ** self.t)
+
+            # Оновлення параметрів
+            params[key] -= self.learning_rate * m_hat / (np.sqrt(v_hat) + self.epsilon)
+
+
+# Завантаження та підготовка даних
+(X_train, y_train), (X_test, y_test) = cifar10.load_data()
+
+# Нормалізація даних
+X_train = X_train.astype('float32') / 255.0
+X_test = X_test.astype('float32') / 255.0
+
+# One-hot encoding для міток
+y_train = to_categorical(y_train, 10)
+y_test = to_categorical(y_test, 10)
+
+# Розділення на тренувальну та валідаційну вибірки
+X_train, X_val, y_train, y_val = train_test_split(
+    X_train, y_train, test_size=0.2, random_state=42)
+
+
+def calculate_accuracy(predictions, targets):
+    predicted_classes = np.argmax(predictions, axis=1)
+    true_classes = np.argmax(targets, axis=1)
+    return np.mean(predicted_classes == true_classes)
+
+
+# Створення моделі та оптимізатора
+model = CNN()
+optimizer = Adam(learning_rate=0.001)
+
+# Гіперпараметри
+n_epochs = 10
+batch_size = 32
+n_batches = len(X_train) // batch_size
+
+# Масиви для зберігання метрик
+train_losses = []
+val_losses = []
+train_accuracies = []
+val_accuracies = []
+
+for epoch in range(n_epochs):
+    print(f'Epoch {epoch + 1}/{n_epochs}')
+
+    # Перемішування даних
+    indices = np.random.permutation(len(X_train))
+    X_train = X_train[indices]
+    y_train = y_train[indices]
+
+    # Тренування на батчах
+    epoch_loss = 0
+    epoch_accuracy = 0
+    for i in tqdm(range(n_batches)):
+        start = i * batch_size
+        end = start + batch_size
+
+        X_batch = X_train[start:end]
+        y_batch = y_train[start:end]
+
+        # Прямий прохід
+        probs = model.forward(X_batch, training=True)
+        loss = cross_entropy_loss(probs, y_batch)
+        epoch_loss += loss
+
+        # Обчислення accuracy для батча
+        batch_accuracy = calculate_accuracy(probs, y_batch)
+        epoch_accuracy += batch_accuracy
+
+        # Зворотне поширення та оновлення параметрів через Adam
+        gradients = model.backward(X_batch, y_batch)  # отримуємо градієнти
+        optimizer.update(model.params, gradients)  # оновлюємо параметри через Adam
+
+        # Візуалізація після кожного 100-го батча
+        if i % 100 == 0:
+            visualize_feature_maps(model.cache['conv1'], 'Conv1')
+            visualize_feature_maps(model.cache['conv2'], 'Conv2')
+            visualize_feature_maps(model.cache['conv3'], 'Conv3')
+            visualize_feature_maps(model.cache['conv4'], 'Conv4')
+            visualize_feature_maps(model.cache['conv5'], 'Conv5')
+
+    # Середні значення метрик на епоху
+    epoch_loss /= n_batches
+    epoch_accuracy /= n_batches
+    train_losses.append(epoch_loss)
+    train_accuracies.append(epoch_accuracy)
+
+    # Валідація
+    val_probs = model.forward(X_val)
+    val_loss = cross_entropy_loss(val_probs, y_val)
+    val_accuracy = calculate_accuracy(val_probs, y_val)
+
+    val_losses.append(val_loss)
+    val_accuracies.append(val_accuracy)
+
+    print(f'Epoch {epoch + 1}/{n_epochs}:')
+    print(f'Train loss: {epoch_loss:.4f}, Train accuracy: {epoch_accuracy:.4f}')
+    print(f'Val loss: {val_loss:.4f}, Val accuracy: {val_accuracy:.4f}')
+
+# Фінальне тестування на тестовій вибірці
+test_probs = model.forward(X_test)
+test_loss = cross_entropy_loss(test_probs, y_test)
+test_accuracy = calculate_accuracy(test_probs, y_test)
+
+print('\nFinal results:')
+print(f'Test loss: {test_loss:.4f}, Test accuracy: {test_accuracy:.4f}')
+
+# Візуалізація метрик
+plt.figure(figsize=(12, 4))
+
+# Графік втрат
+plt.subplot(1, 2, 1)
+plt.plot(train_losses, label='Train Loss')
+plt.plot(val_losses, label='Validation Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+plt.title('Training and Validation Loss')
+
+# Графік точності
+plt.subplot(1, 2, 2)
+plt.plot(train_accuracies, label='Train Accuracy')
+plt.plot(val_accuracies, label='Validation Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.title('Training and Validation Accuracy')
+
+plt.tight_layout()
+plt.show()
+
+# Візуалізація фільтрів
+visualize_filters(model.filters1, 'Layer 1 Filters')
+visualize_filters(model.filters2, 'Layer 2 Filters')
+visualize_filters(model.filters3, 'Layer 3 Filters')
+visualize_filters(model.filters4, 'Layer 4 Filters')
+visualize_filters(model.filters5, 'Layer 5 Filters')
