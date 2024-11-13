@@ -32,7 +32,7 @@ def svm_loss_naive(W, X, y, reg):
         correct_class_score = scores[y[i]]
         for j in range(num_classes):
             if j == y[i]:
-                pass
+                continue
             margin = scores[j] - correct_class_score + 1  # note delta = 1
             if margin > 0:
                 loss += margin
@@ -81,17 +81,21 @@ def svm_loss_vectorized(W, X, y, reg):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     # compute the loss and the gradient
-    # compute the loss and the gradient
     num_classes = W.shape[1]
     num_train = X.shape[0]
 
     scores = X.dot(W)
-    scores_yi = np.zeros_like(scores)
-    for i in range(num_train):
-        scores_yi[i] = scores[i, y[i]]
 
-    loss = (np.sum(np.maximum(np.zeros((num_train, num_classes)), scores - scores_yi + 1.0))/num_train - 1.0 +
-            reg * np.sum(W * W))
+    # note: it is correct but slow
+    # scores_yi = np.zeros_like(scores)
+    # for i in range(num_train):
+    #     scores_yi[i] = scores[i, y[i]]
+
+    # note: it is correct and fast
+    scores_yi = scores[range(num_train), y].reshape(-1, 1)
+
+    loss = np.sum(np.maximum(np.zeros((num_train, num_classes)), scores - scores_yi + 1.0))/num_train - 1.0
+    + reg * np.sum(W * W)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -105,6 +109,13 @@ def svm_loss_vectorized(W, X, y, reg):
     # loss.                                                                     #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+    boundaries = scores - scores_yi + 1.0
+    boundaries[boundaries < 0] = 0
+    boundaries[range(num_train), y] = 0
+    boundaries[boundaries > 0] = 1
+    boundaries[np.arange(num_train), y] = -np.sum(boundaries, axis=1)
+    dW = X.T.dot(boundaries) / num_train
 
     dW += 2.0 * reg * W
 
