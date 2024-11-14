@@ -1,15 +1,14 @@
-from __future__ import print_function, division
+from __future__ import division, print_function
+
 from future import standard_library
 
 standard_library.install_aliases()
-from builtins import range
-from builtins import object
 import os
 import pickle as pickle
+from builtins import object, range
 
 import numpy as np
-
-from cs231n import optim
+from src import optim
 
 
 class Solver(object):
@@ -283,7 +282,9 @@ class Solver(object):
             last_it = t == num_iterations - 1
             if first_it or last_it or epoch_end:
                 train_acc = self.check_accuracy(
-                    self.X_train, self.y_train, num_samples=self.num_train_samples
+                    self.X_train,
+                    self.y_train,
+                    num_samples=self.num_train_samples,
                 )
                 val_acc = self.check_accuracy(
                     self.X_val, self.y_val, num_samples=self.num_val_samples

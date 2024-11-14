@@ -1,25 +1,26 @@
-from builtins import range
-from builtins import object
-import numpy as np
+from builtins import object, range
 
-from ..layers import *
-from ..layer_utils import *
+import numpy as np
+from src.layer_utils import *
+from src.layers import *
 
 
 class FullyConnectedNet(object):
     """Class for a multi-layer fully connected neural network.
 
     Network contains an arbitrary number of hidden layers, ReLU nonlinearities,
-    and a softmax loss function. This will also implement dropout and batch/layer
-    normalization as options. For a network with L layers, the architecture will be
+    and a softmax loss function. This will also implement dropout and
+    batch/layer normalization as options. For a network with L layers, the
+    architecture will be
 
-    {affine - [batch/layer norm] - relu - [dropout]} x (L - 1) - affine - softmax
+    {affine - [batch/layer norm] - relu - [dropout]} x (L - 1) - affine -
+    softmax
 
-    where batch/layer normalization and dropout are optional and the {...} block is
-    repeated L - 1 times.
+    where batch/layer normalization and dropout are optional and the {...}
+    block is repeated L - 1 times.
 
-    Learnable parameters are stored in the self.params dictionary and will be learned
-    using the Solver class.
+    Learnable parameters are stored in the self.params dictionary and will be
+    learned using the Solver class.
     """
 
     def __init__(
@@ -74,7 +75,22 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        self.params["W1"] = np.random.normal(
+            scale=weight_scale, size=(input_dim, hidden_dims[0])
+        )
+        self.params["b1"] = np.zeros(hidden_dims[0])
+
+        for i in range(1, len(hidden_dims)):
+            self.params[f"W{i+1}"] = np.random.normal(
+                scale=weight_scale,
+                size=(hidden_dims[i - 1], hidden_dims[i]),
+            )
+            self.params[f"b{i+1}"] = np.zeros(hidden_dims[i])
+
+        self.params[f"W{self.num_layers}"] = np.random.normal(
+            scale=weight_scale, size=(hidden_dims[-1], num_classes)
+        )
+        self.params[f"b{self.num_layers}"] = np.zeros(num_classes)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -97,7 +113,9 @@ class FullyConnectedNet(object):
         # pass of the second batch normalization layer, etc.
         self.bn_params = []
         if self.normalization == "batchnorm":
-            self.bn_params = [{"mode": "train"} for i in range(self.num_layers - 1)]
+            self.bn_params = [
+                {"mode": "train"} for i in range(self.num_layers - 1)
+            ]
         if self.normalization == "layernorm":
             self.bn_params = [{} for i in range(self.num_layers - 1)]
 
@@ -107,7 +125,7 @@ class FullyConnectedNet(object):
 
     def loss(self, X, y=None):
         """Compute loss and gradient for the fully connected net.
-        
+
         Inputs:
         - X: Array of input data of shape (N, d_1, ..., d_k)
         - y: Array of labels, of shape (N,). y[i] gives the label for X[i].
