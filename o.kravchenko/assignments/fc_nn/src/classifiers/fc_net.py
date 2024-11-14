@@ -61,24 +61,13 @@ class FullyConnectedNet(object):
         self.dtype = dtype
         self.params = {}
 
-        ############################################################################
-        # TODO: Initialize the parameters of the network, storing all values in    #
-        # the self.params dictionary. Store weights and biases for the first layer #
-        # in W1 and b1; for the second layer use W2 and b2, etc. Weights should be #
-        # initialized from a normal distribution centered at 0 with standard       #
-        # deviation equal to weight_scale. Biases should be initialized to zero.   #
-        #                                                                          #
-        # When using batch normalization, store scale and shift parameters for the #
-        # first layer in gamma1 and beta1; for the second layer use gamma2 and     #
-        # beta2, etc. Scale parameters should be initialized to ones and shift     #
-        # parameters should be initialized to zeros.                               #
-        ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
         self.params["W1"] = np.random.normal(
             scale=weight_scale, size=(input_dim, hidden_dims[0])
         )
         self.params["b1"] = np.zeros(hidden_dims[0])
+        self.params["gamma1"] = np.ones(hidden_dims[0])
+        self.params["beta1"] = np.zeros(hidden_dims[0])
 
         for i in range(1, len(hidden_dims)):
             self.params[f"W{i+1}"] = np.random.normal(
@@ -86,20 +75,19 @@ class FullyConnectedNet(object):
                 size=(hidden_dims[i - 1], hidden_dims[i]),
             )
             self.params[f"b{i+1}"] = np.zeros(hidden_dims[i])
+            self.params[f"gamma{i+1}"] = np.ones(hidden_dims[i])
+            self.params[f"beta{i+1}"] = np.zeros(hidden_dims[i])
 
         self.params[f"W{self.num_layers}"] = np.random.normal(
             scale=weight_scale, size=(hidden_dims[-1], num_classes)
         )
         self.params[f"b{self.num_layers}"] = np.zeros(num_classes)
-
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-        ############################################################################
-        #                             END OF YOUR CODE                             #
-        ############################################################################
 
         # When using dropout we need to pass a dropout_param dictionary to each
-        # dropout layer so that the layer knows the dropout probability and the mode
-        # (train / test). You can pass the same dropout_param to each dropout layer.
+        # dropout layer so that the layer knows the dropout probability
+        # and the mode (train / test). You can pass the same dropout_param
+        # to each dropout layer.
         self.dropout_param = {}
         if self.use_dropout:
             self.dropout_param = {"mode": "train", "p": dropout_keep_ratio}
@@ -108,9 +96,10 @@ class FullyConnectedNet(object):
 
         # With batch normalization we need to keep track of running means and
         # variances, so we need to pass a special bn_param object to each batch
-        # normalization layer. You should pass self.bn_params[0] to the forward pass
-        # of the first batch normalization layer, self.bn_params[1] to the forward
-        # pass of the second batch normalization layer, etc.
+        # normalization layer. You should pass self.bn_params[0]
+        # to the forward pass of the first batch normalization layer,
+        # self.bn_params[1] to the forward pass of the second
+        # batch normalization layer, etc.
         self.bn_params = []
         if self.normalization == "batchnorm":
             self.bn_params = [
